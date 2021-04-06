@@ -29,7 +29,7 @@ export interface Cmd {
 import { cli } from "https://deno.land/x/cobra/mod.ts";
 
 // create a root command
-const root = cli({use: "greeting"});
+const root = cli({ use: "greeting" });
 // add a subcommand
 const hello = root.addCommand({
   use: "hello --name string [--strong]",

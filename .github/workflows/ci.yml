@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - '*'
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        deno-version: [1.8.2]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+
+      - name: Use Deno Version ${{ matrix.deno-version }}
+        uses: denolib/setup-deno@master
+        with:
+          deno-version: ${{ matrix.deno-version }}
+
+      - name: Lint module
+        run: deno fmt --check
+
+      - name: Run tests
+        env:
+          TMPDIR: ${{ runner.temp }}
+          CI: true
+
+        run: deno test --allow-all --unstable --failfast --coverage=./cov
+
+      - name: Generate lcov
+        run: deno coverage --unstable --lcov ./cov > cov.lcov
