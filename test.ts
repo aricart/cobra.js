@@ -68,7 +68,7 @@ Deno.test("matches nested commands", async () => {
 Deno.test("matches nested commands", async () => {
   const root = cli({
     use: "test",
-    run: (cmd, args, flags) => {
+    run: () => {
       return Promise.resolve(0);
     },
   });
@@ -99,13 +99,4 @@ Deno.test("command needs use", () => {
     Error,
     "use is required",
   );
-});
-
-Deno.test("command without run dumps help", async () => {
-  const root = cli({ use: "test" });
-  root.addCommand({ use: "a" } as Cmd);
-  const rv = await root.execute(["a"]);
-  assertEquals(rv, 1);
-  assertEquals(root.lastCmd.cmd.name, "a");
-  assertEquals(root.lastCmd.helped, true);
 });
