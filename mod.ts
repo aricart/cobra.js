@@ -232,16 +232,15 @@ export interface Execute {
 }
 
 export class RootCommand extends Command implements Execute {
-  results!: { cmd: Command; args: string[]; flags: Flag[] };
+  lastCmd!: {
+    cmd: Command;
+    args: string[];
+    flags: Map<string, Flag>;
+    helped?: boolean;
+  };
   _help: Flag;
-  constructor(name: string) {
-    super({
-      use: name,
-      run: (cmd: Command): Promise<number> => {
-        cmd.help();
-        return Promise.resolve(1);
-      },
-    });
+  constructor(cmd: Cmd) {
+    super(cmd);
 
     this._help = this.addFlag({
       name: "help",
@@ -253,9 +252,6 @@ export class RootCommand extends Command implements Execute {
   }
   matchCmd(args: string[]): [Command, string[]] {
     const argv = parse(args, { "--": true });
-    // console.dir(argv);
-
-    // find the target command
     let cmd = this as Command;
     const a = (argv._ ?? []).map((v) => {
       return `${v}`;
@@ -271,18 +267,21 @@ export class RootCommand extends Command implements Execute {
         match = cmd.commands.filter((c) => {
           return c.name === verb;
         });
-      }
-      if (match.length > 1) {
-        throw new Error(`ambiguous command ${verb}`);
-      }
 
-      if (match.length === 0) {
-        // not found, put the arg back
-        a.unshift(verb);
+        if (match.length > 1) {
+          throw new Error(`ambiguous command ${verb}`);
+        }
+
+        if (match.length === 0) {
+          // not found, put the arg back
+          a.unshift(verb);
+          break;
+        }
+        if (match.length === 1) {
+          cmd = match[0];
+        }
+      } else {
         break;
-      }
-      if (match.length === 1) {
-        cmd = match[0];
       }
     }
     return [cmd, a];
@@ -331,18 +330,43 @@ export class RootCommand extends Command implements Execute {
       }
     });
 
+    const fm = flagMap(cf);
+    this.lastCmd = { cmd: cmd, args: a, flags: fm };
+
     if (this._help.value) {
       cmd.help();
+      this.lastCmd.helped = true;
       return Promise.resolve(1);
     }
-
-    this.results = { cmd, args: a, flags: cf };
-    return cmd.run(cmd, a, flagMap(cf));
+    return cmd.run(cmd, a, fm);
   }
 }
 
-export function cli(name: string): RootCommand {
-  return new RootCommand(name);
+export function cli(opts: Partial<Cmd>): RootCommand {
+  opts = opts ?? {};
+  if (!opts.use) {
+    throw new Error("use is required");
+  }
+  if (opts.run) {
+    const orig = opts.run;
+    opts.run = (cmd, args, flags): Promise<number> => {
+      const h = flags.get("help");
+      if (h && h.value) {
+        cmd.help();
+        return Promise.resolve(1);
+      }
+      return orig(cmd, args, flags);
+    };
+  }
+  const d = {
+    run: (cmd: Command): Promise<number> => {
+      cmd.help();
+      return Promise.resolve(1);
+    },
+  } as Partial<Cmd>;
+
+  opts = Object.assign(d, opts);
+  return new RootCommand(opts as Cmd);
 }
 
 function max(s1?: string, s2?: string): string {

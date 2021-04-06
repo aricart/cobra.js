@@ -1,4 +1,4 @@
-import { cli } from "./cmd.ts";
+import { cli } from "./mod.ts";
 
 const root = cli("greeting");
 const hello = root.addCommand({

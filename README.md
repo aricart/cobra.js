@@ -26,10 +26,10 @@ export interface Cmd {
 
 ```typescript
 // import the library
-import { cli } from "./cmd.ts";
+import { cli } from "https://deno.land/x/cobra/mod.ts";
 
 // create a root command
-const root = cli("greeting");
+const root = cli({use: "greeting"});
 // add a subcommand
 const hello = root.addCommand({
   use: "hello --name string [--strong]",
