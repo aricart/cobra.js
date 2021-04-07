@@ -4,7 +4,7 @@ import { sprintf } from "https://deno.land/std/fmt/printf.ts";
 export type Run = (
   cmd: Command,
   args: string[],
-  flags: Map<string, Flag>,
+  flags: Flags,
 ) => Promise<number>;
 
 export interface Cmd {
@@ -44,17 +44,70 @@ function flag(f: Partial<Flag>): Flag {
   return Object.assign(d, f);
 }
 
-function flagMap(flags: Flag[]): Map<string, Flag> {
-  const m = new Map<string, Flag>();
-  flags.forEach((f) => {
-    if (f.name) {
-      m.set(f.name, f);
+export interface Flags {
+  value<T>(n: string): T;
+  values<T>(n: string): T[];
+  getFlag(n: string): Flag | null;
+}
+
+export class FlagsImpl implements Flags {
+  m: Map<string, Flag>;
+
+  constructor(flags: Flag[]) {
+    this.m = new Map<string, Flag>();
+    flags.forEach((f) => {
+      if (f.name) {
+        this.m.set(f.name, f);
+      }
+      if (f.short) {
+        this.m.set(f.short, f);
+      }
+    });
+  }
+
+  getFlag(n: string): Flag | null {
+    const f = this.m.get(n);
+    if (f === undefined) {
+      return null;
     }
-    if (f.short) {
-      m.set(f.short, f);
+    return f;
+  }
+
+  defaultValue<T = unknown>(f: Flag): T {
+    let t;
+    if (f.type === "string") {
+      t = "";
+    } else if (f.type === "boolean") {
+      t = false;
+    } else if (f.type === "number") {
+      t = 0;
     }
-  });
-  return m;
+    return t as unknown as T;
+  }
+
+  value<T = unknown>(n: string): T {
+    const f = this.m.get(n);
+    if (!f) {
+      throw new Error("unknown flag ${n}");
+    }
+    let v = f.value ?? f.default ?? this.defaultValue(f);
+    if (Array.isArray(v)) {
+      v = v[0];
+    }
+    return v as T;
+  }
+
+  values<T = unknown>(n: string): T[] {
+    const f = this.m.get(n);
+    if (!f) {
+      throw new Error("unknown flag ${n}");
+    }
+    let v = f.value ?? f.default ?? this.defaultValue(f);
+    if (!Array.isArray(v)) {
+      v = [v];
+    }
+    return v as T[];
+  }
 }
 
 export class Command implements Cmd {
@@ -188,7 +241,7 @@ export class Command implements Cmd {
     return this.parent.getFlag(name);
   }
 
-  run(cmd: Command, args: string[], flags: Map<string, Flag>): Promise<number> {
+  run(cmd: Command, args: string[], flags: Flags): Promise<number> {
     return this.cmd.run(cmd, args, flags);
   }
 
@@ -235,7 +288,7 @@ export class RootCommand extends Command implements Execute {
   lastCmd!: {
     cmd: Command;
     args: string[];
-    flags: Map<string, Flag>;
+    flags: Flags;
     helped?: boolean;
   };
   _help: Flag;
@@ -289,11 +342,11 @@ export class RootCommand extends Command implements Execute {
 
   execute(args: string[] = Deno.args): Promise<number> {
     const [cmd, a] = this.matchCmd(args);
-    const opts = cmd.getFlags();
+    const flags = cmd.getFlags();
 
     // deno-lint-ignore no-explicit-any
     const parseOpts = { "--": true } as any;
-    opts.forEach((f) => {
+    flags.forEach((f) => {
       const key = f.short.length ? f.short : f.name;
 
       if (f.short && f.name) {
@@ -316,8 +369,8 @@ export class RootCommand extends Command implements Execute {
     const argv = parse(args, parseOpts);
     argv._ = a;
 
-    const cf: Flag[] = [];
-    opts.forEach((f) => {
+    flags.forEach((f) => {
+      f.changed = false;
       const key = f.short.length ? f.short : f.name;
       if (argv[key]) {
         f.value = argv[key];
@@ -326,11 +379,11 @@ export class RootCommand extends Command implements Execute {
         } else {
           f.changed = true;
         }
-        cf.push(f);
       }
     });
 
-    const fm = flagMap(cf);
+    const fm = new FlagsImpl(flags);
+
     this.lastCmd = { cmd: cmd, args: a, flags: fm };
 
     if (this._help.value) {
@@ -350,7 +403,7 @@ export function cli(opts: Partial<Cmd>): RootCommand {
   if (opts.run) {
     const orig = opts.run;
     opts.run = (cmd, args, flags): Promise<number> => {
-      const h = flags.get("help");
+      const h = flags.getFlag("help");
       if (h && h.value) {
         cmd.help();
         return Promise.resolve(1);
@@ -387,10 +440,6 @@ export function calcPad(
   s[0] = s[0] ?? "";
   s[1] = s[1] ?? "";
   return { short: s[0].length, long: s[1].length };
-}
-
-export function argNames(f: Partial<Flag>): [string?, string?] {
-  return [f.short, f.name];
 }
 
 export function flagHelp(

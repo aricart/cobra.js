@@ -1,12 +1,17 @@
 import { cli } from "./mod.ts";
 
-const root = cli("greeting");
+// create the root command
+const root = cli({ use: "greeting (hello|goodbye) [--name name] [--strong]" });
+// add a subcommand
 const hello = root.addCommand({
   use: "hello --name string [--strong]",
   short: "says hello",
+  // this is the handler for the command, you get
+  // the command being executed, any args following a `--`
+  // and an object to let you access relevant flags.
   run: (cmd, args, flags): Promise<number> => {
-    const strong = (flags.get("strong")?.value ?? false) ? "!!!" : "";
-    const n = flags.get("name")?.value ?? "mystery person";
+    const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
+    const n = flags.value<string>("name") ?? "mystery person";
     console.log(`hello ${n}${strong}`);
     return Promise.resolve(0);
   },
@@ -29,8 +34,8 @@ const goodbye = root.addCommand({
   use: "goodbye --name string [--strong]",
   short: "says goodbye",
   run: (cmd, args, flags): Promise<number> => {
-    const strong = (flags.get("strong")?.value ?? false) ? "!!!" : "";
-    const n = flags.get("name")?.value ?? "mystery person";
+    const strong = flags.value<boolean>("strong") ? "!!!" : "";
+    const n = flags.value<string>("name") ?? "mystery person";
     console.log(`goodbye ${n}${strong}`);
     return Promise.resolve(0);
   },

@@ -3,14 +3,14 @@ import {
   assertEquals,
   assertThrows,
 } from "https://deno.land/std/testing/asserts.ts";
-import { cli, Cmd, Command, Flag } from "./mod.ts";
+import { cli, Cmd, Command, Flag, Flags } from "./mod.ts";
 
 export function buildCmd(v: Partial<Cmd>, debug = false): Cmd {
   const d = {
     run: (
       cmd: Command,
       args: string[],
-      flags: Map<string, Flag>,
+      flags: Flags,
     ): Promise<number> => {
       if (debug) {
         console.info(cmd.name, args, flags);
@@ -76,9 +76,9 @@ Deno.test("matches nested commands", async () => {
 
   const rv = await root.execute(["-S", "short flag"]);
   assertEquals(rv, 0);
-  assert(root.lastCmd.flags.get("S"));
-  assertEquals(root.lastCmd.flags.get("S")!.value, "short flag");
-  assertEquals(root.lastCmd.flags.get("long-flag")!.value, "short flag");
+  assert(root.lastCmd.flags.getFlag("S"));
+  assertEquals(root.lastCmd.flags.value<string>("S"), "short flag");
+  assertEquals(root.lastCmd.flags.value<string>("long-flag"), "short flag");
 });
 
 Deno.test("nested command will get help", async () => {
@@ -87,7 +87,7 @@ Deno.test("nested command will get help", async () => {
   const rv = await root.execute(["a", "--help"]);
   assertEquals(rv, 1);
   assertEquals(root.lastCmd.cmd.name, "a");
-  assertEquals(root.lastCmd.flags.get("help")!.value, true);
+  assertEquals(root.lastCmd.flags.value<boolean>("help"), true);
 });
 
 Deno.test("command needs use", () => {
