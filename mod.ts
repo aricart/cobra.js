@@ -139,19 +139,27 @@ export class Command implements Cmd {
     return this.cmd.short;
   }
 
+  stdout(s: string) {
+    Deno.stdout.writeSync(new TextEncoder().encode(s));
+  }
+
+  stderr(s: string) {
+    Deno.stderr.writeSync(new TextEncoder().encode(s));
+  }
+
   help(): void {
     // usage for the parent
-    console.log(`${this.use}\n`);
-    console.log("Usage:");
+    this.stderr(`${this.short ?? this.use}\n\n`);
+    this.stderr("Usage:\n");
     if (!this.commands) {
-      console.log(`  ${this.use}`);
+      this.stderr(`  ${this.use}\n`);
     } else {
-      console.log(`  ${this.name} [commands]\n`);
+      this.stderr(`  ${this.name} [commands]\n`);
       // summary of child commands
       this.commands.sort((a, b): number => {
         return a.use.localeCompare(b.use);
       });
-      console.log("Available Commands:");
+      this.stderr("\nAvailable Commands:\n");
       const lens = this.commands.map((cmd): number => {
         return cmd.name.length;
       });
@@ -160,12 +168,12 @@ export class Command implements Cmd {
       });
       this.commands.forEach((cmd) => {
         const n = cmd.name.padEnd(max, " ");
-        console.log(`  ${n}   ${cmd.short}`);
+        this.stderr(`  ${n}   ${cmd.short}\n`);
       });
     }
     const flags = this.getFlags();
     if (flags) {
-      console.log("\nFlags:");
+      this.stderr("\nFlags:\n");
       flags.sort((a, b): number => {
         return a.name.localeCompare(b.name);
       });
@@ -174,7 +182,7 @@ export class Command implements Cmd {
       });
       const pad = calcPad(args);
       flags.forEach((f) => {
-        console.log(`  ${flagHelp(f, pad)}`);
+        this.stderr(`  ${flagHelp(f, pad)}\n`);
       });
     }
   }

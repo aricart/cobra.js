@@ -12,7 +12,7 @@ const hello = root.addCommand({
   run: (cmd, args, flags): Promise<number> => {
     const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
     const n = flags.value<string>("name") ?? "mystery person";
-    console.log(`hello ${n}${strong}`);
+    cmd.stdout(`hello ${n}${strong}`);
     return Promise.resolve(0);
   },
 });
@@ -36,7 +36,7 @@ const goodbye = root.addCommand({
   run: (cmd, args, flags): Promise<number> => {
     const strong = flags.value<boolean>("strong") ? "!!!" : "";
     const n = flags.value<string>("name") ?? "mystery person";
-    console.log(`goodbye ${n}${strong}`);
+    cmd.stdout(`goodbye ${n}${strong}`);
     return Promise.resolve(0);
   },
 });

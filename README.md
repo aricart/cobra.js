@@ -28,19 +28,19 @@ export interface Cmd {
 // import the library
 import { cli } from "https://deno.land/x/cobra/mod.ts";
 
-// create a root command
-const root = cli({ use: "greeting" });
+// create the root command
+const root = cli({ use: "greeting (hello|goodbye) [--name name] [--strong]" });
 // add a subcommand
 const hello = root.addCommand({
   use: "hello --name string [--strong]",
   short: "says hello",
   // this is the handler for the command, you get
   // the command being executed, any args following a `--`
-  // and a map of flag names to flags.
+  // and an object to let you access relevant flags.
   run: (cmd, args, flags): Promise<number> => {
-    const strong = (flags.get("strong")?.value ?? false) ? "!!!" : "";
-    const n = flags.get("name")?.value ?? "mystery person";
-    console.log(`hello ${n}${strong}`);
+    const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
+    const n = flags.value<string>("name") ?? "mystery person";
+    cmd.stdout(`hello ${n}${strong}`);
     return Promise.resolve(0);
   },
 });
