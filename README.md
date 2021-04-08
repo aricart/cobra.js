@@ -30,6 +30,13 @@ import { cli } from "https://deno.land/x/cobra/mod.ts";
 
 // create the root command
 const root = cli({ use: "greeting (hello|goodbye) [--name name] [--strong]" });
+root.addFlag({
+  short: "s",
+  name: "strong",
+  type: "boolean",
+  usage: "say message strongly",
+  persistent: true,
+});
 // add a subcommand
 const hello = root.addCommand({
   use: "hello --name string [--strong]",
@@ -39,11 +46,18 @@ const hello = root.addCommand({
   // and an object to let you access relevant flags.
   run: (cmd, args, flags): Promise<number> => {
     const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
-    const n = flags.value<string>("name") ?? "mystery person";
+    let n = flags.value<string>("name");
+    n = n === "" ? "mystery person" : n;
     cmd.stdout(`hello ${n}${strong}`);
     return Promise.resolve(0);
   },
 });
+```
+
+To execute the cli, simply `root.execute()` with arguments:
+
+```typescript
+Deno.exit(await root.execute(Deno.args));
 ```
 
 The return of the command is a `Promise<number>` which is a number you can use
@@ -86,6 +100,19 @@ hello.addFlag({
   usage: "say hello strongly",
 });
 ```
+
+Processing flags is similarly trivial:
+
+```typescript
+const n = flags.value<string>("name");
+```
+
+The value returned will be the one entered by the user, or the specified default
+in the configuration for the default value for the type - `""` or `false` or
+`0`.
+
+Flags marked as `persistent` can be associated with a container command and are
+available to all subcommands, reducing code duplication.
 
 ## Running your commands
 
