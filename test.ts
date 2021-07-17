@@ -3,7 +3,7 @@ import {
   assertEquals,
   assertThrows,
 } from "https://deno.land/std/testing/asserts.ts";
-import { cli, Cmd, Command, Flag, Flags } from "./mod.ts";
+import { cli, Cmd, Command, Flags } from "./mod.ts";
 
 export function buildCmd(v: Partial<Cmd>, debug = false): Cmd {
   const d = {

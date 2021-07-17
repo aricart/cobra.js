@@ -16,7 +16,7 @@ const hello = root.addCommand({
   // this is the handler for the command, you get
   // the command being executed, any args following a `--`
   // and an object to let you access relevant flags.
-  run: (cmd, args, flags): Promise<number> => {
+  run: (cmd, _args, flags): Promise<number> => {
     const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
     let n = flags.value<string>("name");
     n = n === "" ? "mystery person" : n;
@@ -34,7 +34,7 @@ hello.addFlag({
 const goodbye = root.addCommand({
   use: "goodbye --name string [--strong]",
   short: "says goodbye",
-  run: (cmd, args, flags): Promise<number> => {
+  run: (cmd, _args, flags): Promise<number> => {
     const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
     let n = flags.value<string>("name");
     n = n === "" ? "mystery person" : n;

@@ -48,6 +48,7 @@ export interface Flags {
   value<T>(n: string): T;
   values<T>(n: string): T[];
   getFlag(n: string): Flag | null;
+  checkRequired(): void;
 }
 
 export class FlagsImpl implements Flags {
@@ -108,6 +109,14 @@ export class FlagsImpl implements Flags {
     }
     return v as T[];
   }
+
+  checkRequired() {
+    this.m.forEach((f) => {
+      if (f.required && f.default === f.value) {
+        throw new Error(`--${f.name} is required`);
+      }
+    });
+  }
 }
 
 export class Command implements Cmd {
@@ -115,6 +124,7 @@ export class Command implements Cmd {
   commands!: Command[];
   parent!: Command;
   flags!: Flag[];
+  showHelp: false;
 
   constructor(cmd = {} as Cmd) {
     if (!cmd.use) throw new Error("use is required");
@@ -124,6 +134,7 @@ export class Command implements Cmd {
         return Promise.resolve(1);
       };
     }
+    this.showHelp = false;
     this.cmd = cmd;
   }
 
@@ -254,8 +265,20 @@ export class Command implements Cmd {
     return this.parent.getFlag(name);
   }
 
-  run(cmd: Command, args: string[], flags: Flags): Promise<number> {
-    return this.cmd.run(cmd, args, flags);
+  async run(cmd: Command, args: string[], flags: Flags): Promise<number> {
+    try {
+      const exit = await this.cmd.run(cmd, args, flags);
+      if (exit > 0 && this.showHelp) {
+        cmd.help();
+      }
+      return exit;
+    } catch (err) {
+      cmd.stderr(`${err.message}\n`);
+      if (cmd.showHelp) {
+        cmd.help();
+      }
+      return 1;
+    }
   }
 
   addCommand(cmd: Cmd | Command): Command {
@@ -396,7 +419,6 @@ export class RootCommand extends Command implements Execute {
     });
 
     const fm = new FlagsImpl(flags);
-
     this.lastCmd = { cmd: cmd, args: a, flags: fm };
 
     if (this._help.value) {
