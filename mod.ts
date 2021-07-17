@@ -150,7 +150,10 @@ export class Command implements Cmd {
   help(): void {
     // usage for the parent
     this.stderr(`${this.short ?? this.use}\n\n`);
-    this.stderr("Usage:\n");
+    if (this.long) {
+      this.stderr(`${this.long}`);
+    }
+    this.stderr("\nUsage:\n");
     if (!this.commands) {
       this.stderr(`  ${this.use}\n`);
     } else {
@@ -188,14 +191,16 @@ export class Command implements Cmd {
   }
 
   checkFlags(flag: Flag): boolean {
-    this.flags = this.flags ?? [];
-    const f = this.flags.filter((v) => {
-      const sn = flag.name !== "" && v.name !== "" && flag.name === v.name;
-      const sh = flag.short !== "" && v.short !== "" && flag.short === v.short;
-      return sn || sh;
-    });
-    if (f.length > 0) {
-      return true;
+    if (this.flags) {
+      const f = this.flags.filter((v) => {
+        const sn = flag.name !== "" && v.name !== "" && flag.name === v.name;
+        const sh = flag.short !== "" && v.short !== "" &&
+          flag.short === v.short;
+        return sn || sh;
+      });
+      if (f.length > 0) {
+        return true;
+      }
     }
     if (this.parent) {
       return this.parent.checkFlags(flag);
