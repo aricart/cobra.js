@@ -100,3 +100,163 @@ Deno.test("command needs use", () => {
     "use is required",
   );
 });
+
+Deno.test("flags - non existing flag returns null", async () => {
+  const root = cli({ use: "test" });
+  root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      assertEquals(flags.getFlag("test"), null);
+      return Promise.resolve(0);
+    },
+  });
+
+  const rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+  assertEquals(root.lastCmd.cmd.name, "t");
+});
+
+Deno.test("flags - default value", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      assertEquals(flags.value<boolean>("ok"), false);
+      assertEquals(flags.value<boolean>("dok"), true);
+      assertEquals(flags.value<string>("name"), "");
+      assertEquals(flags.value<string>("dname"), "hello");
+      assertEquals(flags.value<number>("num"), 0);
+      assertEquals(flags.value<number>("dnum"), 10);
+
+      return Promise.resolve(0);
+    },
+  });
+
+  t.addFlag({ name: "ok", type: "boolean" });
+  t.addFlag({ name: "dok", type: "boolean", default: true });
+  t.addFlag({ name: "name", type: "string" });
+  t.addFlag({ name: "dname", type: "string", default: "hello" });
+  t.addFlag({ name: "num", type: "number" });
+  t.addFlag({ name: "dnum", type: "number", default: 10 });
+
+  const rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - unknown flag throws", async () => {
+  const root = cli({ use: "test" });
+  root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      assertThrows(
+        () => {
+          flags.value<boolean>("bad");
+        },
+        Error,
+        "unknown flag bad",
+      );
+
+      return Promise.resolve(0);
+    },
+  });
+
+  const rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - array values", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      const v = flags.values<number>("x");
+      assertEquals(v, [1, 2]);
+      return Promise.resolve(0);
+    },
+  });
+  t.addFlag({
+    name: "x",
+    type: "number",
+  });
+
+  const rv = await root.execute(["t", "--x", "1", "--x", "2"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - array value returns first value", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      const v = flags.value<number>("x");
+      assertEquals(v, 1);
+      return Promise.resolve(0);
+    },
+  });
+  t.addFlag({
+    name: "x",
+    type: "number",
+  });
+
+  const rv = await root.execute(["t", "--x", "1", "--x", "2"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - array values returns array", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      const v = flags.values<number>("x");
+      assertEquals(v, [1]);
+      return Promise.resolve(0);
+    },
+  });
+  t.addFlag({
+    name: "x",
+    type: "number",
+  });
+
+  const rv = await root.execute(["t", "--x", "1"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - array values returns default", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      const v = flags.values<number>("x");
+      assertEquals(v, [0]);
+      return Promise.resolve(0);
+    },
+  });
+  t.addFlag({
+    name: "x",
+    type: "number",
+  });
+
+  const rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+});
+
+Deno.test("flags - unknown values throws", async () => {
+  const root = cli({ use: "test" });
+  root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      assertThrows(
+        () => {
+          flags.values<boolean>("bad");
+        },
+        Error,
+        "unknown flag bad",
+      );
+
+      return Promise.resolve(0);
+    },
+  });
+
+  const rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+});

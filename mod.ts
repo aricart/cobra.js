@@ -89,7 +89,7 @@ export class FlagsImpl implements Flags {
   value<T = unknown>(n: string): T {
     const f = this.m.get(n);
     if (!f) {
-      throw new Error("unknown flag ${n}");
+      throw new Error(`unknown flag ${n}`);
     }
     let v = f.value ?? f.default ?? this.defaultValue(f);
     if (Array.isArray(v)) {
@@ -101,7 +101,7 @@ export class FlagsImpl implements Flags {
   values<T = unknown>(n: string): T[] {
     const f = this.m.get(n);
     if (!f) {
-      throw new Error("unknown flag ${n}");
+      throw new Error(`unknown flag ${n}`);
     }
     let v = f.value ?? f.default ?? this.defaultValue(f);
     if (!Array.isArray(v)) {
