@@ -1,6 +1,25 @@
 import { parse } from "https://deno.land/std/flags/mod.ts";
 import { sprintf } from "https://deno.land/std/fmt/printf.ts";
 
+export interface Flag {
+  type: "string" | "boolean" | "number";
+  name: string;
+  usage: string;
+  short: string;
+  required: boolean;
+  persistent: boolean;
+  changed: boolean;
+  default: null | unknown | unknown[];
+  value: null | unknown | unknown[];
+}
+
+export interface Flags {
+  value<T>(n: string): T;
+  values<T>(n: string): T[];
+  getFlag(n: string): Flag | null;
+  checkRequired(): void;
+}
+
 export type Run = (
   cmd: Command,
   args: string[],
@@ -19,18 +38,6 @@ export function isCommand(t: Command | Cmd): t is Command {
   return v.cmd !== undefined;
 }
 
-export interface Flag {
-  type: "string" | "boolean" | "number";
-  name: string;
-  usage: string;
-  short: string;
-  required: boolean;
-  persistent: boolean;
-  changed: boolean;
-  default: null | unknown | unknown[];
-  value: null | unknown | unknown[];
-}
-
 function flag(f: Partial<Flag>): Flag {
   const d = {} as Flag;
   d.usage = "";
@@ -42,13 +49,6 @@ function flag(f: Partial<Flag>): Flag {
   d.value = null;
 
   return Object.assign(d, f);
-}
-
-export interface Flags {
-  value<T>(n: string): T;
-  values<T>(n: string): T[];
-  getFlag(n: string): Flag | null;
-  checkRequired(): void;
 }
 
 export class FlagsImpl implements Flags {
@@ -158,11 +158,12 @@ export class Command implements Cmd {
     Deno.stderr.writeSync(new TextEncoder().encode(s));
   }
 
-  help(): void {
+  help(long = false): void {
     // usage for the parent
-    this.stderr(`${this.short ?? this.use}\n\n`);
-    if (this.long) {
-      this.stderr(`${this.long}`);
+    if (long) {
+      this.stderr(`${this.long ?? this.short ?? this.use}\n`);
+    } else {
+      this.stderr(`${this.short ?? this.use}\n`);
     }
     this.stderr("\nUsage:\n");
     if (!this.commands) {
@@ -210,7 +211,11 @@ export class Command implements Cmd {
         return sn || sh;
       });
       if (f.length > 0) {
-        return true;
+        throw new Error(
+          `--${flag.name} has conflict with: --${f[0].name} ${
+            f[0].short ? "-" + f[0].short : ""
+          }`,
+        );
       }
     }
     if (this.parent) {
@@ -224,9 +229,7 @@ export class Command implements Cmd {
     pf.name = pf.name ?? "";
     pf.short = pf.short ?? "";
     this.flags = this.flags ?? [];
-    if (this.checkFlags(pf)) {
-      throw new Error(`flag ${pf.name} already exists`);
-    }
+    this.checkFlags(pf);
     this.flags.push(pf);
     return pf;
   }
@@ -422,7 +425,7 @@ export class RootCommand extends Command implements Execute {
     this.lastCmd = { cmd: cmd, args: a, flags: fm };
 
     if (this._help.value) {
-      cmd.help();
+      cmd.help(true);
       this.lastCmd.helped = true;
       return Promise.resolve(1);
     }
