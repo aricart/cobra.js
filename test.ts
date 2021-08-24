@@ -1,5 +1,6 @@
 import {
   assert,
+  assertArrayIncludes,
   assertEquals,
   assertThrows,
 } from "https://deno.land/std/testing/asserts.ts";
@@ -221,13 +222,13 @@ Deno.test("flags - array values returns array", async () => {
   assertEquals(rv, 0);
 });
 
-Deno.test("flags - array values returns default", async () => {
+Deno.test("flags - array values returns empty", async () => {
   const root = cli({ use: "test" });
   const t = root.addCommand({
     use: "t",
     run: (_cmd, _args, flags): Promise<number> => {
       const v = flags.values<number>("x");
-      assertEquals(v, [0]);
+      assertEquals(v, []);
       return Promise.resolve(0);
     },
   });
@@ -259,4 +260,39 @@ Deno.test("flags - unknown values throws", async () => {
 
   const rv = await root.execute(["t"]);
   assertEquals(rv, 0);
+});
+
+Deno.test("flags - values with no value set returns empty", async () => {
+  const root = cli({ use: "test" });
+  let values: string[] = [];
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      values = flags.values<string>("v");
+      return Promise.resolve(0);
+    },
+  });
+  t.addFlag({
+    name: "v",
+    type: "string",
+  });
+
+  let rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+  console.log(values);
+  assertEquals(values.length, 0);
+
+  rv = await root.execute(["t", "--v", "a"]);
+  assertEquals(rv, 0);
+  assertEquals(values.length, 1);
+  assertArrayIncludes(values, ["a"]);
+
+  rv = await root.execute(["t", "--v", "a", "--v", "b"]);
+  assertEquals(rv, 0);
+  assertEquals(values.length, 2);
+  assertArrayIncludes(values, ["a", "b"]);
+
+  rv = await root.execute(["t"]);
+  assertEquals(rv, 0);
+  assertEquals(values.length, 0);
 });

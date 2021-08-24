@@ -103,7 +103,7 @@ export class FlagsImpl implements Flags {
     if (!f) {
       throw new Error(`unknown flag ${n}`);
     }
-    let v = f.value ?? f.default ?? this.defaultValue(f);
+    let v = f.value ?? [];
     if (!Array.isArray(v)) {
       v = [v];
     }
@@ -386,6 +386,7 @@ export class RootCommand extends Command implements Execute {
     // deno-lint-ignore no-explicit-any
     const parseOpts = { "--": true } as any;
     flags.forEach((f) => {
+      f.value = null;
       const key = f.short.length ? f.short : f.name;
 
       if (f.short && f.name) {
