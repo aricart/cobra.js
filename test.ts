@@ -3,7 +3,7 @@ import {
   assertArrayIncludes,
   assertEquals,
   assertThrows,
-} from "https://deno.land/std/testing/asserts.ts";
+} from "https://deno.land/std@0.103.0/testing/asserts.ts";
 import { cli, Cmd, Command, Flags } from "./mod.ts";
 
 export function buildCmd(v: Partial<Cmd>, debug = false): Cmd {
@@ -154,7 +154,7 @@ Deno.test("flags - unknown flag throws", async () => {
           flags.value<boolean>("bad");
         },
         Error,
-        "unknown flag bad",
+        "unknown flag 'bad'",
       );
 
       return Promise.resolve(0);
@@ -251,7 +251,7 @@ Deno.test("flags - unknown values throws", async () => {
           flags.values<boolean>("bad");
         },
         Error,
-        "unknown flag bad",
+        "unknown flag 'bad'",
       );
 
       return Promise.resolve(0);

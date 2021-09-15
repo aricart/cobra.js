@@ -1,5 +1,5 @@
-import { parse } from "https://deno.land/std/flags/mod.ts";
-import { sprintf } from "https://deno.land/std/fmt/printf.ts";
+import { parse } from "https://deno.land/std@0.103.0/flags/mod.ts";
+import { sprintf } from "https://deno.land/std@0.103.0/fmt/printf.ts";
 
 export interface Flag {
   type: "string" | "boolean" | "number";
@@ -89,7 +89,7 @@ export class FlagsImpl implements Flags {
   value<T = unknown>(n: string): T {
     const f = this.m.get(n);
     if (!f) {
-      throw new Error(`unknown flag ${n}`);
+      throw new Error(`unknown flag '${n}'`);
     }
     let v = f.value ?? f.default ?? this.defaultValue(f);
     if (Array.isArray(v)) {
@@ -101,7 +101,7 @@ export class FlagsImpl implements Flags {
   values<T = unknown>(n: string): T[] {
     const f = this.m.get(n);
     if (!f) {
-      throw new Error(`unknown flag ${n}`);
+      throw new Error(`unknown flag '${n}'`);
     }
     let v = f.value ?? [];
     if (!Array.isArray(v)) {
@@ -320,7 +320,7 @@ export class Command implements Cmd {
 }
 
 export interface Execute {
-  execute(): void;
+  execute(args: string[]): void;
 }
 
 export class RootCommand extends Command implements Execute {
