@@ -1,8 +1,8 @@
 # cobra.js
 
-A small cli framework for Deno. This is heavily inspired on the excellent
-[Cobra](https://github.com/spf13/cobra). The framework relies on the Deno's
-built-in [`flags`](https://deno.land/std/flags) library for the parsing of
+A small cli framework for Deno/Node. This is heavily inspired on the excellent
+[Cobra](https://github.com/spf13/cobra). The framework relies on
+[inimist](https://github.com/minimistjs/minimist) library for the parsing of
 arguments.
 
 The foundation to a good cli is good help. Most of the complexity in Cobra.js is
@@ -26,7 +26,7 @@ export interface Cmd {
 
 ```typescript
 // import the library
-import { cli } from "https://deno.land/x/cobra/mod.ts";
+import { cli } from "jsr:@aricart/cobra";
 
 // create the root command
 const root = cli({ use: "greeting (hello|goodbye) [--name name] [--strong]" });
@@ -57,7 +57,7 @@ const hello = root.addCommand({
 To execute the cli, simply `root.execute()` with arguments:
 
 ```typescript
-Deno.exit(await root.execute(Deno.args));
+Deno.exit(await root.execute());
 ```
 
 The return of the command is a `Promise<number>` which is a number you can use
@@ -117,23 +117,26 @@ available to all subcommands, reducing code duplication.
 ## Running your commands
 
 Once you build your command tree and related, flags, you simply call the root
-command's `execute()` with a list of arguments:
+command's `execute()` with an optinoal list of arguments. If not provided it
+will try to get them from `Deno.args` or `process.argv.slice(2)`
 
 ```typescript
-Deno.exit(await root.execute(Deno.args));
+Deno.exit(await root.execute());
 ```
 
 ## Help is built-in
 
 Help is implemented as a persistent flag on the root command, simply passing
 `-h` or `--help` to any command, will display help. The help you get will be
-context sensitive. Container commands will list possible subcommands, and their
+context-sensitive. Container commands will list possible subcommands, and their
 persistent flags. A leaf command will show usage, flags and persistent flags.
 
 This results in help that looks like this:
 
 ```bash
 > deno run main.ts
+# or 
+> node main.ts
 greeting
 
 Usage:

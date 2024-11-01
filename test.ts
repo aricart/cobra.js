@@ -280,7 +280,6 @@ Deno.test("flags - values with no value set returns empty", async () => {
 
   let rv = await root.execute(["t"]);
   assertEquals(rv, 0);
-  console.log(values);
   assertEquals(values.length, 0);
 
   rv = await root.execute(["t", "--v", "a"]);

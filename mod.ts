@@ -379,8 +379,19 @@ export class RootCommand extends Command implements Execute {
     return [cmd, a];
   }
 
-  execute(args: string[] = Deno.args): Promise<number> {
-    const [cmd, a] = this.matchCmd(args);
+  execute(args: string[] | null = null): Promise<number> {
+    if (args === null) {
+      if ("Deno" in globalThis) {
+        //@ts-ignore: global
+        args = globalThis.Deno.args;
+      } else if ("process" in globalThis) {
+        //@ts-ignore: global
+        args = globalThis.process.argv.slice(2);
+      } else {
+        args = [];
+      }
+    }
+    const [cmd, a] = this.matchCmd(args!);
     const flags = cmd.getFlags();
 
     // deno-lint-ignore no-explicit-any
