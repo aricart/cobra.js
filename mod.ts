@@ -1,35 +1,118 @@
 import parseArgs from "minimist";
 import { sprintf } from "@std/fmt/printf";
 
-export interface Flag {
+/**
+ * The `Flag` interface represents a command-line argument or option that can be used in various
+ * applications. This interface includes properties that define the behavior, identity,
+ * and requirements of the flag.
+ */
+export type Flag = {
+  /**
+   * Represents a variable that can hold values of type string, boolean, or number.
+   *
+   * The `type` can be one of the following:
+   * - "string": for textual data.
+   * - "boolean": for true/false values.
+   * - "number": for numeric values.
+   *
+   * This variable type can be useful for scenarios where the value can be one of the multiple data types.
+   */
   type: "string" | "boolean" | "number";
+  /**
+   * The name of the flag - this is the name that is used to access the value associated with the flag.
+   */
   name: string;
+  /**
+   * The usage of the flag - used in the auto-generated help.
+   */
   usage: string;
+  /**
+   * A single character name for the flag.
+   */
   short: string;
+  /**
+   * Sets whether a particular flag is mandatory. When set to true, the framework
+   * will error usages of the command that don't specify the flag.
+   */
   required: boolean;
+  /**
+   * When set, the flag will be available to any sub-commands.
+   */
   persistent: boolean;
-  changed: boolean;
+  /**
+   * Default value for the flag
+   */
   default: null | unknown | unknown[];
+};
+
+type FlagState = {
+  /**
+   * Set to true if the value of the flag was modified
+   */
+  changed: boolean;
   value: null | unknown | unknown[];
-}
+} & Flag;
 
 export interface Flags {
+  /**
+   * Returns the value of the flag
+   * @param n
+   */
   value<T>(n: string): T;
+
+  /**
+   * Returns the values for the flag name specified (if there are multiple uses of the flag)
+   * @param n
+   */
   values<T>(n: string): T[];
+
+  /**
+   * Returns the configuration of the named flag
+   * @param n
+   */
   getFlag(n: string): Flag | null;
+
+  /**
+   * Performs a check that all required flags have been specified.
+   * If a flag is not specified, this will terminate the command with an error;
+   */
   checkRequired(): void;
 }
 
+/**
+ * The callback for a command.
+ *
+ * @callback Run
+ * @param {Command} cmd - The command to be executed.
+ * @param {string[]} args - The arguments to be passed to the command.
+ * @param {Flags} flags - Access to the flags context.
+ * @returns {Promise<number>} A promise that resolves with the exit code of the command.
+ */
 export type Run = (
   cmd: Command,
   args: string[],
   flags: Flags,
 ) => Promise<number>;
 
+/**
+ * Configuration for a Cmd
+ */
 export interface Cmd {
-  use: string; // one line usage - first word is name of cmd
-  short?: string; // short description shown in help
-  long?: string; // long help (cmd action --help)
+  /**
+   * Single line usage for the command, the first word should be the name of the cmd
+   */
+  use: string;
+  /**
+   * A short description for the command.
+   */
+  short?: string;
+  /**
+   * A long description for the command.
+   */
+  long?: string;
+  /**
+   * Callback for the command
+   */
   run: Run;
 }
 
@@ -38,8 +121,8 @@ export function isCommand(t: Command | Cmd): t is Command {
   return v.cmd !== undefined;
 }
 
-function flag(f: Partial<Flag>): Flag {
-  const d = {} as Flag;
+function flag(f: Partial<FlagState>): FlagState {
+  const d = {} as FlagState;
   d.usage = "";
   d.type = "number";
   d.required = false;
@@ -52,10 +135,10 @@ function flag(f: Partial<Flag>): Flag {
 }
 
 export class FlagsImpl implements Flags {
-  m: Map<string, Flag>;
+  m: Map<string, FlagState>;
 
-  constructor(flags: Flag[]) {
-    this.m = new Map<string, Flag>();
+  constructor(flags: FlagState[]) {
+    this.m = new Map<string, FlagState>();
     flags.forEach((f) => {
       if (f.name) {
         this.m.set(f.name, f);
@@ -123,7 +206,7 @@ export class Command implements Cmd {
   cmd: Cmd;
   commands!: Command[];
   parent!: Command;
-  flags!: Flag[];
+  flags!: FlagState[];
   showHelp: false;
 
   constructor(cmd = {} as Cmd) {
@@ -234,8 +317,8 @@ export class Command implements Cmd {
     return pf;
   }
 
-  getFlags(): Flag[] {
-    const flags: Flag[] = this.flags ?? [];
+  getFlags(): FlagState[] {
+    const flags: FlagState[] = this.flags ?? [];
     let cmd = this.parent;
     while (cmd) {
       if (cmd.flags) {
@@ -330,7 +413,7 @@ export class RootCommand extends Command implements Execute {
     flags: Flags;
     helped?: boolean;
   };
-  _help: Flag;
+  _help: FlagState;
   constructor(cmd: Cmd) {
     super(cmd);
 
@@ -340,7 +423,7 @@ export class RootCommand extends Command implements Execute {
       short: "h",
       persistent: true,
       type: "boolean",
-    });
+    }) as FlagState;
   }
   matchCmd(args: string[]): [Command, string[]] {
     const argv = parseArgs(args, { "--": true });
@@ -445,6 +528,10 @@ export class RootCommand extends Command implements Execute {
   }
 }
 
+/**
+ * Entry option for building the cli tool.
+ * @param opts
+ */
 export function cli(opts: Partial<Cmd>): RootCommand {
   opts = opts ?? {};
   if (!opts.use) {
@@ -453,7 +540,7 @@ export function cli(opts: Partial<Cmd>): RootCommand {
   if (opts.run) {
     const orig = opts.run;
     opts.run = (cmd, args, flags): Promise<number> => {
-      const h = flags.getFlag("help");
+      const h = flags.getFlag("help") as FlagState;
       if (h && h.value) {
         cmd.help();
         return Promise.resolve(1);
