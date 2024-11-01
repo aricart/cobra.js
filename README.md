@@ -2,7 +2,7 @@
 
 A small cli framework for Deno/Node. This is heavily inspired on the excellent
 [Cobra](https://github.com/spf13/cobra). The framework relies on
-[inimist](https://github.com/minimistjs/minimist) library for the parsing of
+[minimist](https://github.com/minimistjs/minimist) library for the parsing of
 arguments.
 
 The foundation to a good cli is good help. Most of the complexity in Cobra.js is
