@@ -1,5 +1,5 @@
-import { parse } from "https://deno.land/std@0.103.0/flags/mod.ts";
-import { sprintf } from "https://deno.land/std@0.103.0/fmt/printf.ts";
+import parseArgs from "minimist";
+import { sprintf } from "@std/fmt/printf";
 
 export interface Flag {
   type: "string" | "boolean" | "number";
@@ -138,15 +138,15 @@ export class Command implements Cmd {
     this.cmd = cmd;
   }
 
-  get use() {
+  get use(): string {
     return this.cmd.use;
   }
 
-  get long() {
+  get long(): string | undefined {
     return this.cmd.long;
   }
 
-  get short() {
+  get short(): string | undefined {
     return this.cmd.short;
   }
 
@@ -276,7 +276,7 @@ export class Command implements Cmd {
       }
       return exit;
     } catch (err) {
-      cmd.stderr(`${err.message}\n`);
+      cmd.stderr(`${(err as Error).message}\n`);
       if (cmd.showHelp) {
         cmd.help();
       }
@@ -343,9 +343,9 @@ export class RootCommand extends Command implements Execute {
     });
   }
   matchCmd(args: string[]): [Command, string[]] {
-    const argv = parse(args, { "--": true });
+    const argv = parseArgs(args, { "--": true });
     let cmd = this as Command;
-    const a = (argv._ ?? []).map((v) => {
+    const a = (argv._ ?? []).map((v: unknown) => {
       return `${v}`;
     });
 
@@ -406,7 +406,7 @@ export class RootCommand extends Command implements Execute {
       }
     });
 
-    const argv = parse(args, parseOpts);
+    const argv = parseArgs(args, parseOpts);
     argv._ = a;
 
     flags.forEach((f) => {

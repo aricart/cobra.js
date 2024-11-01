@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "strict": true
+  },
+  "name": "@aricart/cobra",
+  "version": "0.0.9-1",
+  "exports": {
+    ".": "./mod.ts"
+  },
+  "publish": {
+    "include": [
+      "./**/*"
+    ],
+    "exclude": [
+      "./test.ts"
+    ]
+  },
+  "imports": {
+    "@std/fmt": "jsr:@std/fmt@^1.0.3",
+    "minimist": "npm:minimist@^1.2.8"
+  }
+}

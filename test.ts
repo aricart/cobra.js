@@ -4,7 +4,8 @@ import {
   assertEquals,
   assertThrows,
 } from "https://deno.land/std@0.103.0/testing/asserts.ts";
-import { cli, Cmd, Command, Flags } from "./mod.ts";
+import { cli } from "./mod.ts";
+import type { Cmd, Command, Flags } from "./mod.ts";
 
 export function buildCmd(v: Partial<Cmd>, debug = false): Cmd {
   const d = {
