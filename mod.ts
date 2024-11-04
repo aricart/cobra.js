@@ -1,5 +1,6 @@
 import parseArgs from "minimist";
 import { sprintf } from "@std/fmt/printf";
+import { getRuntime } from "@aricart/runtime";
 
 /**
  * The `Flag` interface represents a command-line argument or option that can be used in various
@@ -233,12 +234,16 @@ export class Command implements Cmd {
     return this.cmd.short;
   }
 
-  stdout(s: string) {
-    Deno.stdout.writeSync(new TextEncoder().encode(s));
+  stdout(_: string) {
+    throw new Error("runtime is not set");
   }
 
-  stderr(s: string) {
-    Deno.stderr.writeSync(new TextEncoder().encode(s));
+  stderr(_: string) {
+    throw new Error("runtime is not set");
+  }
+
+  exit(_: number): void {
+    throw new Error("runtime is not set");
   }
 
   help(long = false): void {
@@ -462,19 +467,20 @@ export class RootCommand extends Command implements Execute {
     return [cmd, a];
   }
 
-  execute(args: string[] | null = null): Promise<number> {
+  async execute(args: string[] | null = null): Promise<number> {
+    const runtime = await getRuntime();
+    this.stdout = runtime.stdout;
+    this.stderr = runtime.stderr;
+    this.exit = runtime.exit;
+    this.commands?.forEach((c) => {
+      c.stdout = runtime.stdout;
+      c.stderr = runtime.stderr;
+      c.exit = runtime.exit;
+    });
     if (args === null) {
-      if ("Deno" in globalThis) {
-        //@ts-ignore: global
-        args = globalThis.Deno.args;
-      } else if ("process" in globalThis) {
-        //@ts-ignore: global
-        args = globalThis.process.argv.slice(2);
-      } else {
-        args = [];
-      }
+      args = runtime.args();
     }
-    const [cmd, a] = this.matchCmd(args!);
+    const [cmd, a] = this.matchCmd(args);
     const flags = cmd.getFlags();
 
     // deno-lint-ignore no-explicit-any

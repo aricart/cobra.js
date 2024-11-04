@@ -3,7 +3,7 @@
     "strict": true
   },
   "name": "@aricart/cobra",
-  "version": "0.0.11",
+  "version": "0.0.13",
   "exports": {
     ".": "./mod.ts"
   },
@@ -16,6 +16,7 @@
     ]
   },
   "imports": {
+    "@aricart/runtime": "jsr:@aricart/runtime@^0.0.1",
     "@std/fmt": "jsr:@std/fmt@^1.0.3",
     "minimist": "npm:minimist@^1.2.8"
   }

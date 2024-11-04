@@ -42,9 +42,12 @@ Deno.test("match nested command", async () => {
 
   assertEquals(root.lastCmd.cmd.name, "world");
   assertEquals(root.lastCmd.args.length, 0);
-  assertEquals(root.lastCmd.cmd.getFlag("A")!.value, true);
-  assertEquals(root.lastCmd.cmd.getFlag("all")!.value, true);
-  assertEquals(root.lastCmd.cmd.getFlag("x")!.value, 12);
+  //@ts-ignore: impl
+  assertEquals(root.lastCmd.cmd.getFlag("A").value, true);
+  //@ts-ignore: impl
+  assertEquals(root.lastCmd.cmd.getFlag("all").value, true);
+  //@ts-ignore: impl
+  assertEquals(root.lastCmd.cmd.getFlag("x").value, 12);
 });
 
 Deno.test("matches nested commands", async () => {
