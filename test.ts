@@ -299,3 +299,17 @@ Deno.test("flags - values with no value set returns empty", async () => {
   assertEquals(rv, 0);
   assertEquals(values.length, 0);
 });
+
+Deno.test("groups", async () => {
+  const root = cli({ use: "test" });
+  const hello = root.addCommand({ use: "hello" });
+  hello.addCommand({
+    use: "hi",
+    run: (cmd, _args, _flags): Promise<number> => {
+      cmd.stdout("hello");
+      return Promise.resolve(0);
+    },
+  });
+
+  await root.execute(["hello", "hi"]);
+});

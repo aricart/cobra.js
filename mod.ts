@@ -3,8 +3,8 @@ import { sprintf } from "@std/fmt/printf";
 import { getRuntime } from "@aricart/runtime";
 
 /**
- * The `Flag` interface represents a command-line argument or option that can be used in various
- * applications. This interface includes properties that define the behavior, identity,
+ * The `Flag` type represents a command-line argument or option that can be used in various
+ * applications. This type includes properties that define the behavior, identity,
  * and requirements of the flag.
  */
 export type Flag = {
@@ -54,7 +54,7 @@ type FlagState = {
   value: null | unknown | unknown[];
 } & Flag;
 
-export interface Flags {
+export type Flags = {
   /**
    * Returns the value of the flag
    * @param n
@@ -78,7 +78,7 @@ export interface Flags {
    * If a flag is not specified, this will terminate the command with an error;
    */
   checkRequired(): void;
-}
+};
 
 /**
  * The callback for a command.
@@ -98,7 +98,7 @@ export type Run = (
 /**
  * Configuration for a Cmd
  */
-export interface Cmd {
+export type Cmd  ={
   /**
    * Single line usage for the command, the first word should be the name of the cmd
    */
@@ -114,7 +114,7 @@ export interface Cmd {
   /**
    * Callback for the command
    */
-  run: Run;
+  run?: Run;
 }
 
 export function isCommand(t: Command | Cmd): t is Command {
@@ -358,7 +358,7 @@ export class Command implements Cmd {
 
   async run(cmd: Command, args: string[], flags: Flags): Promise<number> {
     try {
-      const exit = await this.cmd.run(cmd, args, flags);
+      const exit = await this.cmd.run!(cmd, args, flags);
       if (exit > 0 && this.showHelp) {
         cmd.help();
       }
@@ -407,7 +407,7 @@ export class Command implements Cmd {
   }
 }
 
-export interface Execute {
+export type Execute = {
   execute(args: string[]): void;
 }
 
@@ -472,11 +472,20 @@ export class RootCommand extends Command implements Execute {
     this.stdout = runtime.stdout;
     this.stderr = runtime.stderr;
     this.exit = runtime.exit;
-    this.commands?.forEach((c) => {
+
+    const stack: Command[] = [];
+    if (this.commands) {
+      stack.push(...this.commands);
+    }
+    while (stack.length) {
+      const c = stack.pop()!;
       c.stdout = runtime.stdout;
       c.stderr = runtime.stderr;
       c.exit = runtime.exit;
-    });
+      if (c.commands?.length) {
+        stack.push(...c.commands);
+      }
+    }
     if (args === null) {
       args = runtime.args();
     }

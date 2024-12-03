@@ -3,7 +3,7 @@
     "strict": true
   },
   "name": "@aricart/cobra",
-  "version": "0.0.13",
+  "version": "0.0.15",
   "exports": {
     ".": "./mod.ts"
   },
