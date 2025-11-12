@@ -17,10 +17,10 @@ const hello = root.addCommand({
   // the command being executed, any args following a `--`
   // and an object to let you access relevant flags.
   run: (cmd, _args, flags): Promise<number> => {
-    const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
+    const strong = flags.value<boolean>("strong") ? "!!!" : "";
     let n = flags.value<string>("name");
     n = n === "" ? "mystery person" : n;
-    cmd.stdout(`hello ${n}${strong}`);
+    cmd.stdout(`hello ${n}${strong}\n`);
     return Promise.resolve(0);
   },
 });
@@ -35,10 +35,10 @@ const goodbye = root.addCommand({
   use: "goodbye --name string [--strong]",
   short: "says goodbye",
   run: (cmd, _args, flags): Promise<number> => {
-    const strong = (flags.value<boolean>("strong") ?? false) ? "!!!" : "";
+    const strong = flags.value<boolean>("strong") ? "!!!" : "";
     let n = flags.value<string>("name");
     n = n === "" ? "mystery person" : n;
-    cmd.stdout(`goodbye ${n}${strong}`);
+    cmd.stdout(`goodbye ${n}${strong}\n`);
     return Promise.resolve(0);
   },
 });
@@ -49,4 +49,4 @@ goodbye.addFlag({
   usage: "name to say goodbye to",
 });
 
-Deno.exit(await root.execute(Deno.args));
+Deno.exit(await root.execute());
