@@ -1,0 +1,33 @@
+name: JSR release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout cobra.js
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: 2.x
+
+      - name: Run tests
+        run: deno test
+
+      - name: Check types
+        run: deno check mod.ts
+
+      - name: Publish to JSR
+        run: deno publish

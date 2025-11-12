@@ -7,6 +7,54 @@ import { getRuntime } from "@aricart/runtime";
  * applications. This type includes properties that define the behavior, identity,
  * and requirements of the flag.
  */
+/**
+ * Valid flag value types
+ */
+export type FlagValue = string | boolean | number;
+
+/**
+ * Input type for adding a flag to a command. Requires `type` and at least one of `name` or `short`.
+ *
+ * @example
+ * ```typescript
+ * // Flag with long name only
+ * cmd.addFlag({ type: "string", name: "output", usage: "output file" });
+ *
+ * // Flag with short name only
+ * cmd.addFlag({ type: "boolean", short: "v", usage: "verbose" });
+ *
+ * // Flag with both
+ * cmd.addFlag({ type: "number", name: "port", short: "p", usage: "port number" });
+ * ```
+ */
+export type FlagInput =
+  & {
+    /**
+     * The data type of the flag value.
+     */
+    type: "string" | "boolean" | "number";
+    /**
+     * Description shown in help text. Defaults to empty string.
+     */
+    usage?: string;
+    /**
+     * If true, the flag must be provided or an error is thrown. Defaults to false.
+     */
+    required?: boolean;
+    /**
+     * If true, the flag is inherited by all subcommands. Defaults to false.
+     */
+    persistent?: boolean;
+    /**
+     * Default value when the flag is not provided. Defaults to null.
+     */
+    default?: null | FlagValue | FlagValue[];
+  }
+  & (
+    | { name: string; short?: string }
+    | { name?: string; short: string }
+  );
+
 export type Flag = {
   /**
    * Represents a variable that can hold values of type string, boolean, or number.
@@ -43,7 +91,7 @@ export type Flag = {
   /**
    * Default value for the flag
    */
-  default: null | unknown | unknown[];
+  default: null | FlagValue | FlagValue[];
 };
 
 type FlagState = {
@@ -51,31 +99,57 @@ type FlagState = {
    * Set to true if the value of the flag was modified
    */
   changed: boolean;
-  value: null | unknown | unknown[];
+  value: null | FlagValue | FlagValue[];
 } & Flag;
 
+/**
+ * Interface for accessing and validating command-line flags within a command handler.
+ */
 export type Flags = {
   /**
-   * Returns the value of the flag
-   * @param n
+   * Returns the value of the specified flag. If the flag was provided multiple times,
+   * returns the first value. Returns the default value if the flag was not provided.
+   *
+   * @param n - The name or short name of the flag
+   * @returns The flag value cast to type T
+   * @throws Error if the flag name doesn't exist
+   *
+   * @example
+   * ```typescript
+   * const port = flags.value<number>("port"); // returns number
+   * const name = flags.value<string>("name"); // returns string
+   * ```
    */
-  value<T>(n: string): T;
+  value<T extends FlagValue = FlagValue>(n: string): T;
 
   /**
-   * Returns the values for the flag name specified (if there are multiple uses of the flag)
-   * @param n
+   * Returns all values for the specified flag as an array. Useful when a flag
+   * can be provided multiple times (e.g., `-v file1 -v file2`).
+   *
+   * @param n - The name or short name of the flag
+   * @returns Array of all flag values
+   * @throws Error if the flag name doesn't exist
+   *
+   * @example
+   * ```typescript
+   * const files = flags.values<string>("file"); // returns string[]
+   * ```
    */
-  values<T>(n: string): T[];
+  values<T extends FlagValue = FlagValue>(n: string): T[];
 
   /**
-   * Returns the configuration of the named flag
-   * @param n
+   * Returns the configuration metadata for the specified flag, or null if not found.
+   *
+   * @param n - The name or short name of the flag
+   * @returns The flag configuration or null
    */
   getFlag(n: string): Flag | null;
 
   /**
-   * Performs a check that all required flags have been specified.
-   * If a flag is not specified, this will terminate the command with an error;
+   * Validates that all required flags have been provided by the user.
+   * Throws an error if any required flag is missing.
+   *
+   * @throws Error with message "--flagname is required"
    */
   checkRequired(): void;
 };
@@ -96,27 +170,52 @@ export type Run = (
 ) => Promise<number>;
 
 /**
- * Configuration for a Cmd
+ * Configuration object for creating a command. Commands can have subcommands
+ * and flags, forming a hierarchical CLI structure.
+ *
+ * @example
+ * ```typescript
+ * const cmd: Cmd = {
+ *   use: "serve [port]",
+ *   short: "Start the web server",
+ *   long: "Starts the web server on the specified port. Defaults to 8080.",
+ *   run: async (cmd, args, flags) => {
+ *     const port = flags.value<number>("port");
+ *     console.log(`Starting server on port ${port}`);
+ *     return 0;
+ *   }
+ * };
+ * ```
  */
-export type Cmd  ={
+export type Cmd = {
   /**
-   * Single line usage for the command, the first word should be the name of the cmd
+   * Usage string for the command. The first word should be the command name,
+   * followed by optional arguments or flags. Shown in help text.
+   *
+   * @example "serve [port]" or "deploy --env production"
    */
   use: string;
   /**
-   * A short description for the command.
+   * Short one-line description of the command. Shown in parent command's help.
    */
   short?: string;
   /**
-   * A long description for the command.
+   * Detailed multi-line description. Shown when command is run with --help.
    */
   long?: string;
   /**
-   * Callback for the command
+   * Handler function executed when the command is run. If omitted, the command
+   * will display help when executed.
    */
   run?: Run;
-}
+};
 
+/**
+ * Type guard to check if an object is a Command instance or just a Cmd configuration.
+ *
+ * @param t - Object to check
+ * @returns true if t is a Command instance
+ */
 export function isCommand(t: Command | Cmd): t is Command {
   const v = t as Command;
   return v.cmd !== undefined;
@@ -158,19 +257,21 @@ export class FlagsImpl implements Flags {
     return f;
   }
 
-  defaultValue<T = unknown>(f: Flag): T {
-    let t;
+  defaultValue<T extends FlagValue = FlagValue>(f: Flag): T {
+    let t: FlagValue;
     if (f.type === "string") {
       t = "";
     } else if (f.type === "boolean") {
       t = false;
     } else if (f.type === "number") {
       t = 0;
+    } else {
+      t = "";
     }
-    return t as unknown as T;
+    return t as T;
   }
 
-  value<T = unknown>(n: string): T {
+  value<T extends FlagValue = FlagValue>(n: string): T {
     const f = this.m.get(n);
     if (!f) {
       throw new Error(`unknown flag '${n}'`);
@@ -182,7 +283,7 @@ export class FlagsImpl implements Flags {
     return v as T;
   }
 
-  values<T = unknown>(n: string): T[] {
+  values<T extends FlagValue = FlagValue>(n: string): T[] {
     const f = this.m.get(n);
     if (!f) {
       throw new Error(`unknown flag '${n}'`);
@@ -203,13 +304,37 @@ export class FlagsImpl implements Flags {
   }
 }
 
+/**
+ * Command represents a single command in the CLI hierarchy. Commands can have
+ * subcommands, flags, and a run handler. Use the `cli()` function to create
+ * a root command.
+ *
+ * @example
+ * ```typescript
+ * const root = cli({ use: "myapp" });
+ * const serve = root.addCommand({
+ *   use: "serve",
+ *   short: "Start server",
+ *   run: async (cmd, args, flags) => {
+ *     console.log("Server starting...");
+ *     return 0;
+ *   }
+ * });
+ * ```
+ */
 export class Command implements Cmd {
   cmd: Cmd;
-  commands!: Command[];
-  parent!: Command;
-  flags!: FlagState[];
+  commands: Command[];
+  parent: Command | null;
+  flags: FlagState[];
   showHelp: false;
 
+  /**
+   * Creates a new Command instance.
+   *
+   * @param cmd - Command configuration
+   * @throws Error if `use` field is not provided
+   */
   constructor(cmd = {} as Cmd) {
     if (!cmd.use) throw new Error("use is required");
     if (!cmd.run) {
@@ -220,16 +345,28 @@ export class Command implements Cmd {
     }
     this.showHelp = false;
     this.cmd = cmd;
+    this.commands = [];
+    this.parent = null;
+    this.flags = [];
   }
 
+  /**
+   * The usage string for this command. The first word is the command name.
+   */
   get use(): string {
     return this.cmd.use;
   }
 
+  /**
+   * The detailed multi-line description for this command. Shown when run with --help.
+   */
   get long(): string | undefined {
     return this.cmd.long;
   }
 
+  /**
+   * The short one-line description for this command. Shown in parent's help output.
+   */
   get short(): string | undefined {
     return this.cmd.short;
   }
@@ -246,6 +383,12 @@ export class Command implements Cmd {
     throw new Error("runtime is not set");
   }
 
+  /**
+   * Prints help information for this command to stderr. Shows usage, available subcommands,
+   * and flags (both local and inherited persistent flags).
+   *
+   * @param long - If true, displays the long description. If false, shows short description.
+   */
   help(long = false): void {
     // usage for the parent
     if (long) {
@@ -254,7 +397,7 @@ export class Command implements Cmd {
       this.stderr(`${this.short ?? this.use}\n`);
     }
     this.stderr("\nUsage:\n");
-    if (!this.commands) {
+    if (this.commands.length === 0) {
       this.stderr(`  ${this.use}\n`);
     } else {
       this.stderr(`  ${this.name} [commands]\n`);
@@ -271,11 +414,11 @@ export class Command implements Cmd {
       });
       this.commands.forEach((cmd) => {
         const n = cmd.name.padEnd(max, " ");
-        this.stderr(`  ${n}   ${cmd.short}\n`);
+        this.stderr(`  ${n}   ${cmd.short ?? ""}\n`);
       });
     }
     const flags = this.getFlags();
-    if (flags) {
+    if (flags.length) {
       this.stderr("\nFlags:\n");
       flags.sort((a, b): number => {
         return a.name.localeCompare(b.name);
@@ -291,7 +434,7 @@ export class Command implements Cmd {
   }
 
   checkFlags(flag: Flag): boolean {
-    if (this.flags) {
+    if (this.flags.length) {
       const f = this.flags.filter((v) => {
         const sn = flag.name !== "" && v.name !== "" && flag.name === v.name;
         const sh = flag.short !== "" && v.short !== "" &&
@@ -312,21 +455,43 @@ export class Command implements Cmd {
     return false;
   }
 
-  addFlag(f: Partial<Flag>): Flag {
+  /**
+   * Adds a flag to this command. The flag will be available when the command is executed.
+   *
+   * @param f - Flag configuration requiring at least `type` and one of `name` or `short`
+   * @returns The created Flag object
+   * @throws Error if a flag with the same name or short already exists in this command or parent
+   *
+   * @example
+   * ```typescript
+   * cmd.addFlag({
+   *   type: "number",
+   *   name: "port",
+   *   short: "p",
+   *   usage: "Port number",
+   *   default: 8080
+   * });
+   * ```
+   */
+  addFlag(f: FlagInput): Flag {
     const pf = flag(f);
     pf.name = pf.name ?? "";
     pf.short = pf.short ?? "";
-    this.flags = this.flags ?? [];
     this.checkFlags(pf);
     this.flags.push(pf);
     return pf;
   }
 
+  /**
+   * Returns all flags available to this command, including inherited persistent flags from parent commands.
+   *
+   * @returns Array of all flags (own flags + persistent flags from parents)
+   */
   getFlags(): FlagState[] {
-    const flags: FlagState[] = this.flags ?? [];
+    const flags: FlagState[] = this.flags;
     let cmd = this.parent;
     while (cmd) {
-      if (cmd.flags) {
+      if (cmd.flags.length) {
         const pf = cmd.flags.filter((f) => {
           return f.persistent;
         });
@@ -342,11 +507,11 @@ export class Command implements Cmd {
   }
 
   getFlag(name: string): Flag | null {
-    if (this.flags) {
+    if (this.flags.length) {
       const m = this.flags.filter((f) => {
         return f.name === name;
       });
-      if (m && m.length > 0) {
+      if (m.length > 0) {
         return m[0];
       }
     }
@@ -372,13 +537,31 @@ export class Command implements Cmd {
     }
   }
 
+  /**
+   * Adds a subcommand to this command. The subcommand will be available when executing the parent.
+   *
+   * @param cmd - Command configuration or Command instance
+   * @returns The created Command instance
+   * @throws Error if a sibling command with the same name already exists
+   *
+   * @example
+   * ```typescript
+   * const serve = root.addCommand({
+   *   use: "serve [port]",
+   *   short: "Start the server",
+   *   run: async (cmd, args, flags) => {
+   *     console.log("Server starting...");
+   *     return 0;
+   *   }
+   * });
+   * ```
+   */
   addCommand(cmd: Cmd | Command): Command {
     if (isCommand(cmd)) {
       cmd = cmd.cmd;
     }
     const ci = new Command(cmd);
     ci.parent = this;
-    this.commands = this.commands ?? [];
     // make sure no sibling is named this
     const m = this.commands.filter((v) => {
       return ci.name === v.name;
@@ -390,6 +573,12 @@ export class Command implements Cmd {
     return ci;
   }
 
+  /**
+   * The name of this command, extracted as the first word from the `use` field.
+   *
+   * @example
+   * If `use` is "serve [port]", then `name` returns "serve"
+   */
   get name(): string {
     let name = this.cmd.use;
     const idx = name.indexOf(" ");
@@ -399,6 +588,11 @@ export class Command implements Cmd {
     return name;
   }
 
+  /**
+   * Returns the root command by traversing up the parent chain.
+   *
+   * @returns The root command (the command with no parent)
+   */
   root(): Command {
     if (this.parent) {
       return this.parent.root();
@@ -407,21 +601,41 @@ export class Command implements Cmd {
   }
 }
 
+/**
+ * Interface for executing a command with arguments.
+ */
 export type Execute = {
-  execute(args: string[]): void;
-}
+  /**
+   * Executes the command with the provided arguments.
+   *
+   * @param args - Command-line arguments to parse and execute
+   * @returns Exit code (0 for success, non-zero for error)
+   */
+  execute(args: string[]): Promise<number>;
+};
 
+/**
+ * The root command of a CLI application. Extends Command with execution capabilities.
+ * Created via the `cli()` function. Automatically adds a `--help` flag.
+ *
+ * @example
+ * ```typescript
+ * const root = cli({ use: "myapp" });
+ * Deno.exit(await root.execute());
+ * ```
+ */
 export class RootCommand extends Command implements Execute {
-  lastCmd!: {
+  lastCmd: {
     cmd: Command;
     args: string[];
     flags: Flags;
     helped?: boolean;
-  };
+  } | null;
   _help: FlagState;
   constructor(cmd: Cmd) {
     super(cmd);
 
+    this.lastCmd = null;
     this._help = this.addFlag({
       name: "help",
       usage: `display ${this.name.split(" ")[0]}'s help`,
@@ -467,6 +681,22 @@ export class RootCommand extends Command implements Execute {
     return [cmd, a];
   }
 
+  /**
+   * Executes the CLI application. Parses arguments, matches commands, processes flags,
+   * and invokes the appropriate command handler.
+   *
+   * @param args - Arguments to parse. If null, automatically uses Deno.args or process.argv
+   * @returns Exit code (0 for success, non-zero for error)
+   *
+   * @example
+   * ```typescript
+   * // Auto-detect runtime args
+   * await root.execute();
+   *
+   * // Explicit args
+   * await root.execute(["serve", "--port", "3000"]);
+   * ```
+   */
   async execute(args: string[] | null = null): Promise<number> {
     const runtime = await getRuntime();
     this.stdout = runtime.stdout;
@@ -544,8 +774,32 @@ export class RootCommand extends Command implements Execute {
 }
 
 /**
- * Entry option for building the cli tool.
- * @param opts
+ * Creates a new root command for a CLI application. This is the main entry point
+ * for building a CLI with cobra.js. The root command automatically gets a `--help` flag.
+ *
+ * @param opts - Command configuration. The `use` field is required.
+ * @returns A RootCommand instance ready to add subcommands and flags
+ * @throws Error if `use` field is not provided
+ *
+ * @example
+ * ```typescript
+ * // Simple CLI
+ * const root = cli({ use: "myapp" });
+ *
+ * // CLI with handler
+ * const root = cli({
+ *   use: "myapp [options]",
+ *   short: "My application",
+ *   run: async (cmd, args, flags) => {
+ *     console.log("Running myapp");
+ *     return 0;
+ *   }
+ * });
+ *
+ * // Add subcommands and execute
+ * root.addCommand({ use: "serve", short: "Start server" });
+ * Deno.exit(await root.execute());
+ * ```
  */
 export function cli(opts: Partial<Cmd>): RootCommand {
   opts = opts ?? {};
@@ -580,6 +834,13 @@ function max(s1?: string, s2?: string): string {
   return s1.length > s2.length ? s1 : s2;
 }
 
+/**
+ * Calculates the padding needed for aligning flag help text. Used internally
+ * by the help system to format flag output.
+ *
+ * @param flags - Array of [short, long] flag name pairs
+ * @returns Object with short and long padding lengths
+ */
 export function calcPad(
   flags: [string?, string?][],
 ): { short: number; long: number } {
@@ -594,6 +855,17 @@ export function calcPad(
   return { short: s[0].length, long: s[1].length };
 }
 
+/**
+ * Formats a flag for display in help text with proper alignment. Used internally
+ * by the help system.
+ *
+ * @param f - The flag to format
+ * @param pad - Padding lengths for alignment
+ * @returns Formatted help string for the flag
+ *
+ * @example
+ * Returns strings like: "-p, --port   Port number"
+ */
 export function flagHelp(
   f: Partial<Flag>,
   pad: { short: number; long: number },
