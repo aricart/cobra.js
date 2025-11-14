@@ -153,6 +153,42 @@ Deno.test("flags - default value", async () => {
   assertEquals(rv, 0);
 });
 
+Deno.test("flags - numeric flag with zero value", async () => {
+  const root = cli({ use: "test" });
+  const t = root.addCommand({
+    use: "t",
+    run: (_cmd, _args, flags): Promise<number> => {
+      // verify that 0 is treated as an explicit value, not as "not set"
+      assertEquals(flags.value<number>("port"), 0);
+      assertEquals(flags.value<number>("timeout"), 0);
+      assertEquals(flags.value<number>("count"), 0);
+      // verify that a flag with default still returns 0 when explicitly set to 0
+      assertEquals(flags.value<number>("retry"), 0);
+      //@ts-ignore: impl
+      assertEquals(flags.getFlag("retry").changed, true);
+
+      return Promise.resolve(0);
+    },
+  });
+
+  t.addFlag({ name: "port", short: "p", type: "number", usage: "test" });
+  t.addFlag({ name: "timeout", short: "t", type: "number", usage: "test" });
+  t.addFlag({ name: "count", type: "number", usage: "test" });
+  t.addFlag({ name: "retry", type: "number", default: 5, usage: "test" });
+
+  const rv = await root.execute([
+    "t",
+    "-p",
+    "0",
+    "--timeout=0",
+    "--count",
+    "0",
+    "--retry",
+    "0",
+  ]);
+  assertEquals(rv, 0);
+});
+
 Deno.test("flags - unknown flag throws", async () => {
   const root = cli({ use: "test" });
   root.addCommand({

@@ -751,7 +751,7 @@ export class RootCommand extends Command implements Execute {
     flags.forEach((f) => {
       f.changed = false;
       const key = f.short.length ? f.short : f.name;
-      if (argv[key]) {
+      if (key in argv) {
         f.value = argv[key];
         if (parseOpts.default && parseOpts.default[key]) {
           f.changed = argv[key] !== parseOpts.default[key];
