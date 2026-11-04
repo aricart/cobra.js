@@ -14,14 +14,14 @@ jobs:
 
     steps:
       - name: Checkout cobra.js
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@v2
         with:
-          deno-version: 2.x
+          deno-version: 2.9.x
 
       - name: Run tests
         run: deno test

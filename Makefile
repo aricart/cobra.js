@@ -2,11 +2,11 @@
 
 
 test: clean
-	deno lint --unstable
-	deno test --allow-all --unstable --reload --coverage=coverage
+	deno lint
+	deno test --allow-all --reload --coverage=coverage
 
 cover:
-	deno coverage --unstable ./coverage --lcov > ./coverage/out.lcov
+	deno coverage ./coverage --lcov > ./coverage/out.lcov
 	genhtml -o ./coverage/html ./coverage/out.lcov
 	open ./coverage/html/index.html
 
