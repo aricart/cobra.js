@@ -9,33 +9,39 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   test:
     strategy:
       matrix:
-        deno-version: [2.x]
+        deno-version: [2.9.x]
 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Use Deno Version ${{ matrix.deno-version }}
-        uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@v2
         with:
           deno-version: ${{ matrix.deno-version }}
 
-      - name: Lint module
+      - name: Format
         run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
 
       - name: Run tests
         env:
           TMPDIR: ${{ runner.temp }}
           CI: true
 
-        run: deno test --allow-all --unstable --failfast --coverage=./cov
+        run: deno test --allow-all --fail-fast --coverage=./cov
 
       - name: Generate lcov
-        run: deno coverage --unstable --lcov ./cov > cov.lcov
+        run: deno coverage --lcov ./cov > cov.lcov
