@@ -14,5 +14,5 @@ clean:
 	rm -rf ./coverage
 
 fmt:
-	deno fmt src/ tests/
+	deno fmt src/ tests/ examples/
 

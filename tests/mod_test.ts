@@ -2,10 +2,20 @@ import {
   assert,
   assertArrayIncludes,
   assertEquals,
+  assertStringIncludes,
   assertThrows,
 } from "@std/assert";
-import { calcPad, cli, Command } from "./mod.ts";
-import type { Cmd, Flags } from "./mod.ts";
+import { cli, Command } from "../src/mod.ts";
+import type { Cmd, Flags } from "../src/mod.ts";
+
+// collects what a command writes to stderr
+function capture(cmd: Command): { text(): string } {
+  let out = "";
+  cmd.stderr = (s: string) => {
+    out += s;
+  };
+  return { text: () => out };
+}
 
 export function buildCmd(v: Partial<Cmd>, debug = false): Cmd {
   const d = {
@@ -355,18 +365,14 @@ Deno.test("groups", async () => {
   await root.execute(["hello", "hi"]);
 });
 
-Deno.test("flags - required flag throws when missing", async () => {
-  let errorThrown = false;
+Deno.test("flags - required flag fails when missing", async () => {
+  let ran = false;
   const root = cli({ use: "test" });
   const t = root.addCommand({
     use: "t",
     run: (_cmd, _args, flags): Promise<number> => {
-      try {
-        flags.checkRequired();
-      } catch (e) {
-        errorThrown = true;
-        throw e;
-      }
+      ran = true;
+      flags.checkRequired();
       return Promise.resolve(0);
     },
   });
@@ -377,15 +383,18 @@ Deno.test("flags - required flag throws when missing", async () => {
     required: true,
     usage: "config file path",
   });
+  const err = capture(t);
 
-  // should throw when required flag is missing
+  // the command doesn't run without the required flag
   const rv = await root.execute(["t"]);
-  assertEquals(rv, 1); // should return error code
-  assertEquals(errorThrown, true);
+  assertEquals(rv, 1);
+  assertEquals(ran, false);
+  assertStringIncludes(err.text(), 'required flag(s) "config" not set');
 
-  // should succeed when required flag is provided
-  const rv2 = await root.execute(["t", "--config", "test.json"]);
-  assertEquals(rv2, 0);
+  // and runs with it, even when the value is empty
+  assertEquals(await root.execute(["t", "--config", "test.json"]), 0);
+  assertEquals(await root.execute(["t", "-c", ""]), 0);
+  assertEquals(ran, true);
 });
 
 Deno.test("flags - duplicate flag names throw error", () => {
@@ -812,17 +821,6 @@ Deno.test("cli - with run that checks help flag", async () => {
   assertEquals(helpChecked, false); // help intercepted before run
 });
 
-Deno.test("flags - calcPad with empty and null strings", () => {
-  const root = cli({ use: "test" });
-  root.addFlag({ name: "", short: "", type: "string", usage: "test" });
-  root.addFlag({ name: "a", short: "b", type: "string", usage: "test2" });
-
-  // this exercises the max function with empty strings
-  const pad = calcPad([["", ""], ["a", "b"]]);
-  assertEquals(pad.short, 1);
-  assertEquals(pad.long, 1);
-});
-
 Deno.test("commands - matchCmd with command that has no subcommands", async () => {
   const root = cli({ use: "test" });
   const _leaf = root.addCommand({
@@ -910,13 +908,6 @@ Deno.test("cli - called with undefined opts", () => {
     Error,
     "use is required",
   );
-});
-
-Deno.test("flags - calcPad with empty strings", () => {
-  // testing null coalescing in max function
-  const pad = calcPad([["", ""]]);
-  assertEquals(pad.short, 0);
-  assertEquals(pad.long, 0);
 });
 
 Deno.test("flags - flagHelp with empty usage", async () => {
@@ -1042,4 +1033,307 @@ Deno.test("flags - non-persistent parent flag blocks child with same name", asyn
   // Execute to verify parent's non-persistent flag is NOT available to child
   await root.execute(["verb", "subverb"]);
   // The child command can't access parent's non-persistent flag
+});
+
+// a root with persistent --ws (boolean) and --server/-s (string), and a pub
+// command with --msgs (number) and --stream (string)
+function bench() {
+  let ran = false;
+  const root = cli({ use: "bench" });
+  root.addFlag({ name: "ws", type: "boolean", persistent: true });
+  root.addFlag({
+    name: "server",
+    short: "s",
+    type: "string",
+    persistent: true,
+    default: "localhost",
+  });
+  let got: Record<string, unknown> | null = null;
+  const pub = root.addCommand({
+    use: "pub <subject>",
+    run: (_cmd, args, flags): Promise<number> => {
+      ran = true;
+      got = {
+        args,
+        ws: flags.value("ws"),
+        server: flags.value("server"),
+        msgs: flags.value("msgs"),
+      };
+      return Promise.resolve(0);
+    },
+  });
+  pub.addFlag({ name: "msgs", type: "number", default: 100 });
+  const err = capture(pub);
+  capture(root);
+  return { root, pub, err, got: () => got, ran: () => ran };
+}
+
+Deno.test("parse - boolean before the command doesn't take it as a value", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["--ws", "pub", "test"]), 0);
+  assertEquals(b.root.lastCmd!.cmd.name, "pub");
+  assertEquals(b.got(), {
+    args: ["test"],
+    ws: true,
+    server: "localhost",
+    msgs: 100,
+  });
+});
+
+Deno.test("parse - persistent string flag before the command", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["-s", "nats://x", "pub", "t"]), 0);
+  assertEquals(b.got()!.server, "nats://x");
+  assertEquals(b.got()!.args, ["t"]);
+});
+
+Deno.test("parse - unknown flag is an error", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["pub", "test", "--wokers", "3"]), 1);
+  assertEquals(b.ran(), false);
+  assertStringIncludes(b.err.text(), "--wokers");
+});
+
+Deno.test("parse - number flag rejects non numbers", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["pub", "t", "--msgs", "abc"]), 1);
+  assertStringIncludes(
+    b.err.text(),
+    'invalid argument "abc" for "--msgs" flag: not a number',
+  );
+});
+
+Deno.test("parse - negative numbers as values", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["pub", "t", "--msgs", "-5"]), 0);
+  assertEquals(b.got()!.msgs, -5);
+});
+
+Deno.test("parse - boolean forms", async () => {
+  for (
+    const [args, ws] of [
+      [["pub", "t", "--ws"], true],
+      [["pub", "t", "--ws=true"], true],
+      [["pub", "t", "--ws=false"], false],
+      [["pub", "t", "--no-ws"], false],
+      [["pub", "t"], false],
+    ] as [string[], boolean][]
+  ) {
+    const b = bench();
+    assertEquals(await b.root.execute(args), 0, args.join(" "));
+    assertEquals(b.got()!.ws, ws, args.join(" "));
+  }
+});
+
+Deno.test("parse - args after -- are positionals", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["pub", "a", "--", "--msgs", "b"]), 0);
+  assertEquals(b.got()!.args, ["a", "--msgs", "b"]);
+  assertEquals(b.got()!.msgs, 100);
+});
+
+Deno.test("parse - changed is true when the default is given", async () => {
+  const b = bench();
+  assertEquals(await b.root.execute(["pub", "t", "--msgs", "100"]), 0);
+  //@ts-ignore: impl
+  assertEquals(b.root.lastCmd!.flags.getFlag("msgs").changed, true);
+  assertEquals(await b.root.execute(["pub", "t"]), 0);
+  //@ts-ignore: impl
+  assertEquals(b.root.lastCmd!.flags.getFlag("msgs").changed, false);
+});
+
+Deno.test("flags - getFlags doesn't change the command's flags", async () => {
+  const b = bench();
+  await b.root.execute(["pub", "t"]);
+  b.pub.getFlags();
+  assertEquals(b.pub.flags.map((f) => f.name), ["msgs"]);
+});
+
+Deno.test("flags - a flag needs a name or a short name", () => {
+  const root = cli({ use: "test" });
+  assertThrows(
+    () => root.addFlag({ type: "string" }),
+    Error,
+    "a flag needs a name or a short name",
+  );
+  assertThrows(
+    () => root.addFlag({ type: "string", short: "ab" }),
+    Error,
+    "must be a single character",
+  );
+});
+
+Deno.test("help - works before execute", () => {
+  const root = cli({ use: "test" });
+  root.addFlag({ name: "x", type: "string", usage: "x flag" });
+  const err = capture(root);
+  root.help();
+  assertStringIncludes(err.text(), "--x");
+});
+
+Deno.test("types - default follows the flag type", () => {
+  const root = cli({ use: "test" });
+  root.addFlag({ name: "a", type: "number", default: 1 });
+  root.addFlag({ name: "b", type: "string", default: "x" });
+  root.addFlag({ name: "c", type: "boolean", default: true });
+  // @ts-expect-error: a number flag's default is a number
+  root.addFlag({ name: "d", type: "number", default: "1" });
+  // @ts-expect-error: a boolean flag's default is a boolean
+  root.addFlag({ name: "e", type: "boolean", default: "yes" });
+  // @ts-expect-error: unknown field
+  root.addFlag({ name: "f", type: "string", defualt: "x" });
+});
+
+// the greeting example from the readme
+function greeting() {
+  const root = cli({ use: "greeting", short: "says hello or goodbye" });
+  root.addFlag({
+    short: "s",
+    name: "strong",
+    type: "boolean",
+    usage: "say message strongly",
+    persistent: true,
+  });
+  const run = () => Promise.resolve(0);
+  const hello = root.addCommand({ use: "hello", short: "says hello", run });
+  hello.addFlag({
+    short: "n",
+    name: "name",
+    type: "string",
+    usage: "name to say hello to",
+  });
+  const goodbye = root.addCommand({
+    use: "goodbye",
+    short: "says goodbye",
+    run,
+  });
+  goodbye.addFlag({
+    short: "n",
+    name: "name",
+    type: "string",
+    usage: "name to say goodbye to",
+  });
+  return { root, hello, goodbye };
+}
+
+// expected output is what go's cobra v1.10.2 prints for the same program,
+// minus the help and completion commands it adds
+Deno.test("help - parent command matches go cobra", async () => {
+  const { root } = greeting();
+  const err = capture(root);
+  assertEquals(await root.execute([]), 1);
+  assertEquals(
+    err.text(),
+    `says hello or goodbye
+
+Usage:
+  greeting [command]
+
+Available Commands:
+  goodbye     says goodbye
+  hello       says hello
+
+Flags:
+  -h, --help     help for greeting
+  -s, --strong   say message strongly
+
+Use "greeting [command] --help" for more information about a command.
+`,
+  );
+});
+
+Deno.test("help - subcommand matches go cobra", async () => {
+  const { root, hello } = greeting();
+  const err = capture(hello);
+  assertEquals(await root.execute(["hello", "-h"]), 1);
+  assertEquals(
+    err.text(),
+    `says hello
+
+Usage:
+  greeting hello [flags]
+
+Flags:
+  -h, --help          help for hello
+  -n, --name string   name to say hello to
+
+Global Flags:
+  -s, --strong   say message strongly
+`,
+  );
+});
+
+Deno.test("help - unknown flag matches go cobra", async () => {
+  const { root, hello } = greeting();
+  const err = capture(hello);
+  assertEquals(await root.execute(["hello", "--nope"]), 1);
+  assertEquals(
+    err.text(),
+    `Error: unknown flag: --nope
+Usage:
+  greeting hello [flags]
+
+Flags:
+  -h, --help          help for hello
+  -n, --name string   name to say hello to
+
+Global Flags:
+  -s, --strong   say message strongly
+
+`,
+  );
+});
+
+Deno.test("help - defaults, types and short-only flags", () => {
+  const root = cli({ use: "app", run: () => Promise.resolve(0) });
+  root.addFlag({ name: "server", type: "string", default: "localhost" });
+  root.addFlag({ name: "port", short: "p", type: "number", default: 4222 });
+  root.addFlag({ name: "count", type: "number" });
+  root.addFlag({ short: "v", type: "boolean", usage: "verbose" });
+  assertEquals(
+    root.usage(),
+    `Usage:
+  app [flags]
+
+Flags:
+      --count number
+  -h, --help            help for app
+  -p, --port number     (default 4222)
+      --server string   (default "localhost")
+  -v                    verbose
+`,
+  );
+});
+
+Deno.test("help - use with arguments and a parent path", () => {
+  const root = cli({ use: "nats" });
+  const kv = root.addCommand({ use: "kv", short: "kv things" });
+  const get = kv.addCommand({
+    use: "get <bucket> <key>",
+    run: () => Promise.resolve(0),
+  });
+  assertEquals(get.commandPath(), "nats kv get");
+  assertStringIncludes(
+    get.usage(),
+    "Usage:\n  nats kv get <bucket> <key> [flags]\n",
+  );
+  assertStringIncludes(kv.usage(), "Usage:\n  nats kv [command]\n");
+});
+
+Deno.test("errors - required and missing values in cobra's words", async () => {
+  const root = cli({ use: "app", run: () => Promise.resolve(0) });
+  root.addFlag({ name: "config", type: "string", required: true });
+  const err = capture(root);
+  assertEquals(await root.execute([]), 1);
+  assert(err.text().startsWith('Error: required flag(s) "config" not set\n'));
+
+  const root2 = cli({ use: "app", run: () => Promise.resolve(0) });
+  root2.addFlag({ name: "config", type: "string" });
+  const err2 = capture(root2);
+  assertEquals(await root2.execute(["--config"]), 1);
+  assert(err2.text().startsWith("Error: flag needs an argument: --config\n"));
+
+  const err3 = capture(root2);
+  assertEquals(await root2.execute(["-x"]), 1);
+  assert(err3.text().startsWith("Error: unknown shorthand flag: 'x' in -x\n"));
 });

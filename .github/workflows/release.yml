@@ -1,0 +1,65 @@
+name: NPM/JSR release
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout cobra.js
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26.x
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.x
+
+      - name: Set tag
+        run: |
+          VER="${GITHUB_REF#refs/*/}"
+          echo "RELEASE_VERSION=$VER" >> $GITHUB_ENV
+          if [[ "$VER" == *-* ]]; then
+            echo "NPM_TAG=next" >> $GITHUB_ENV
+          else
+            echo "NPM_TAG=latest" >> $GITHUB_ENV
+          fi
+
+      - name: Test
+        run: |
+          deno test --allow-all
+          npm install
+          npm run build
+          npm test
+
+      - name: Dry run
+        run: |
+          deno publish --allow-dirty --dry-run
+          npm publish --provenance --access public --tag="${NPM_TAG}" --dry-run
+
+      - name: Publish JSR
+        run: deno publish --allow-dirty
+
+      - name: Publish NPM
+        run: |
+          name=$(node -p "require('./package.json').name")
+          ver=$(node -p "require('./package.json').version")
+          if [ -n "$(npm view "$name@$ver" version 2>/dev/null)" ]; then
+            echo "$name@$ver is already on npm, skipping"
+          else
+            npm publish --provenance --access public --tag="${NPM_TAG}"
+          fi

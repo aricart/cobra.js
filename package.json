@@ -1,0 +1,57 @@
+{
+  "name": "@aricart/cobra",
+  "version": "0.2.0",
+  "description": "A lightweight, type-safe CLI framework for Node.js, Deno and Bun, inspired by Go's cobra",
+  "files": [
+    "lib/",
+    "LICENSE",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "types": "./lib/mod.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./lib/esm/mod.d.ts",
+        "default": "./lib/esm/mod.js"
+      },
+      "require": {
+        "types": "./lib/mod.d.ts",
+        "default": "./lib/mod.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">= 22"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aricart/cobra.js.git"
+  },
+  "private": false,
+  "scripts": {
+    "clean": "shx rm -Rf ./lib",
+    "build-cjs": "npm run clean && tsc",
+    "build-esm": "tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('lib/esm/package.json', JSON.stringify({type: 'module', sideEffects: false}) + '\\n')\"",
+    "build": "npm run build-cjs && npm run build-esm",
+    "prepack": "npm run build",
+    "test": "node tests/node_test.mjs && node tests/node_test.cjs"
+  },
+  "keywords": [
+    "cli",
+    "cobra",
+    "command",
+    "flags",
+    "deno",
+    "node",
+    "bun"
+  ],
+  "author": "Alberto Ricart",
+  "devDependencies": {
+    "@types/node": "^25.6.1",
+    "shx": "^0.4.0",
+    "typescript": "^5.9.2"
+  }
+}
