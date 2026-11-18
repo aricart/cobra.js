@@ -1,6 +1,6 @@
 {
   "name": "@aricart/cobra",
-  "version": "0.2.0",
+  "version": "0.2.1-0",
   "description": "A lightweight, type-safe CLI framework for Node.js, Deno and Bun, inspired by Go's cobra",
   "files": [
     "lib/",
