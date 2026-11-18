@@ -1,7 +1,10 @@
-import { cli } from "./mod.ts";
+import { cli } from "../src/mod.ts";
 
 // create the root command
-const root = cli({ use: "greeting (hello|goodbye) [--name name] [--strong]" });
+const root = cli({
+  use: "greeting",
+  short: "says hello or goodbye",
+});
 root.addFlag({
   short: "s",
   name: "strong",
@@ -11,7 +14,7 @@ root.addFlag({
 });
 // add a subcommand
 const hello = root.addCommand({
-  use: "hello --name string [--strong]",
+  use: "hello",
   short: "says hello",
   // this is the handler for the command, you get
   // the command being executed, any args following a `--`
@@ -32,7 +35,7 @@ hello.addFlag({
 });
 
 const goodbye = root.addCommand({
-  use: "goodbye --name string [--strong]",
+  use: "goodbye",
   short: "says goodbye",
   run: (cmd, _args, flags): Promise<number> => {
     const strong = flags.value<boolean>("strong") ? "!!!" : "";
@@ -49,4 +52,4 @@ goodbye.addFlag({
   usage: "name to say goodbye to",
 });
 
-Deno.exit(await root.execute());
+root.exit(await root.execute());
