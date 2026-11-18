@@ -5,6 +5,12 @@ on:
     types: [created]
   workflow_dispatch:
 
+# runs for the same tag wait for each other, so a duplicate run sees the
+# version the first one published instead of racing it
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test-and-publish:
     runs-on: ubuntu-latest
@@ -60,6 +66,16 @@ jobs:
           ver=$(node -p "require('./package.json').version")
           if [ -n "$(npm view "$name@$ver" version 2>/dev/null)" ]; then
             echo "$name@$ver is already on npm, skipping"
-          else
-            npm publish --provenance --access public --tag="${NPM_TAG}"
+            exit 0
           fi
+          set +e
+          out=$(npm publish --provenance --access public --tag="${NPM_TAG}" 2>&1)
+          status=$?
+          set -e
+          echo "$out"
+          # E409: another run published (or staged) this version first
+          if [ $status -ne 0 ] && echo "$out" | grep -q "E409"; then
+            echo "$name@$ver was published by another run, nothing to do"
+            exit 0
+          fi
+          exit $status
