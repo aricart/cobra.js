@@ -2,6 +2,7 @@
   "compilerOptions": {
     "strict": true
   },
+  "nodeModulesDir": "none",
   "name": "@aricart/cobra",
   "version": "0.2.0",
   "exports": {
